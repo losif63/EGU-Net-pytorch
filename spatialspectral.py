@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 device = (
     "cuda"
@@ -10,6 +11,28 @@ device = (
     else "cpu"
 )
 
+class EndmemberNetwork(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.enc1 = nn.Sequential(
+            nn.Conv2d(224, 256, 1, 1, 0),
+            nn.BatchNorm2d(256),
+            nn.Dropout(0.1),
+            nn.Tanh()
+        )
+        self.enc2 = nn.Sequential(
+            nn.Conv2d(256, 128, 1, 1, 0),
+            nn.BatchNorm2d(128),
+            nn.Tanh()
+        )
+    def forward(self, x, encoder1: nn.Sequential, encoder2: nn.Sequential):
+        x = self.enc1(x)
+        x = self.enc2(x)
+        x = encoder1(x)
+        x = encoder2(x)
+        return x
+    
+    
 class UnmixingReconstructionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
