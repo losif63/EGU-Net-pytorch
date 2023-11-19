@@ -6,6 +6,7 @@ import os
 import scipy.io as scio
 import torch.optim as optim
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 device = (
     "cuda"
@@ -168,5 +169,11 @@ for epoch in tqdm(range(200)):
     if epoch % 10 == 0:
         print(f"{epoch + 1}, running_loss: {running_loss / 10}")
         running_loss = 0.0
-    
-    
+
+index = 100
+
+plt.imshow(egu_net.ur_net.recon[0, index, :, :].detach().cpu().numpy())
+plt.colorbar()
+
+plt.imshow(x_mixed_image[0, index, :, :].detach().cpu().numpy())
+plt.colorbar()
