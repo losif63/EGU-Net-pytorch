@@ -2,7 +2,7 @@ import os
 import scipy.io as scio
 from torch.utils.data import Dataset
 
-class HS_Training_Dataset(Dataset):
+class HS_Pure_Dataset(Dataset):
     def __init__(self) -> None:
         super().__init__()
         self.labels = scio.loadmat('Data/TrLabel.mat')
@@ -18,7 +18,7 @@ class HS_Training_Dataset(Dataset):
         label = self.labels[index]
         return spectrum, label
 
-class HS_Test_Dataset(Dataset):
+class HS_Mixed_Dataset(Dataset):
     def __init__(self) -> None:
         super().__init__()
         self.labels = scio.loadmat('Data/TeLabel.mat')
