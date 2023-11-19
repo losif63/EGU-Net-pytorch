@@ -4,6 +4,7 @@ from torch import nn
 from torch.nn import functional as F
 import os
 import scipy.io as scio
+import torch.optim as optim
 from tqdm import tqdm
 
 device = (
@@ -13,6 +14,8 @@ device = (
     if torch.backends.mps.is_available()
     else "cpu"
 )
+
+print(device)
 
 class EndmemberNetwork(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
@@ -43,7 +46,7 @@ class EndmemberNetwork(nn.Module):
         x = self.enc4_conv(x)
         self.endmembers = x
         x = self.enc4_softmax(x)
-        # self.abundances = x
+        self.abundances = x.reshape(-1, 5)
         return x
     
 class UnmixingReconstructionNetwork(nn.Module):
@@ -107,7 +110,7 @@ class UnmixingReconstructionNetwork(nn.Module):
         x = self.dec2(x)
         x = self.dec3(x)
         x = self.dec4(x)
-        # self.recon = x
+        self.recon = x
         return x
 
 class EndmemberGuidedUnmixingNetwork(nn.Module):
@@ -131,10 +134,10 @@ Mixed_TrSet = Mixed_TrSet['Mixed_TrSet']
 TrLabel = TrLabel['TrLabel']
 TeLabel = TeLabel['TeLabel']
 
-Pure_TrSet = torch.from_numpy(np.array(Pure_TrSet, dtype=np.float32)).to(device)
-Mixed_TrSet = torch.from_numpy(np.array(Mixed_TrSet, dtype=np.float32)).to(device)
-TrLabel = torch.from_numpy(np.array(TrLabel, dtype=np.float32)).to(device)
-TeLabel = torch.from_numpy(np.array(TeLabel, dtype=np.float32)).to(device)
+Pure_TrSet = torch.from_numpy(np.array(Pure_TrSet, dtype=np.float32)).to(device=device)
+Mixed_TrSet = torch.from_numpy(np.array(Mixed_TrSet, dtype=np.float32)).to(device=device)
+TrLabel = torch.from_numpy(np.array(TrLabel, dtype=np.float32)).to(device=device)
+TeLabel = torch.from_numpy(np.array(TeLabel, dtype=np.float32)).to(device=device)
 
 Y_train = TrLabel
 Y_test = TeLabel
@@ -142,7 +145,28 @@ Y_test = TeLabel
 x_pure_image = Pure_TrSet.view(-1, 1, 1, 224).permute(0, 3, 1, 2)
 x_mixed_image = Mixed_TrSet.view(1, 200, 200, 224).permute(0, 3, 1, 2)
 
-egu_net = EndmemberGuidedUnmixingNetwork()
+egu_net = EndmemberGuidedUnmixingNetwork().to(device=device)
+optimizer = optim.Adam(egu_net.parameters(), lr=0.005)
 
+
+def loss_fn(egunet: EndmemberGuidedUnmixingNetwork):
+    global Y_train
+    cost = 0.0
+    cost += torch.mean(torch.nn.functional.cross_entropy(egunet.e_net.abundances, Y_train))
+    cost += torch.mean(torch.square(egunet.ur_net.recon - x_mixed_image))
+    return cost
+
+running_loss = 0.0
 for epoch in tqdm(range(200)):
+    optimizer.zero_grad()
     egu_net.forward(x_pure=x_pure_image, x_mixed=x_mixed_image)
+    loss = loss_fn(egunet=egu_net)
+    loss.backward()
+    optimizer.step()
+    
+    running_loss += loss.item()
+    if epoch % 10 == 0:
+        print(f"{epoch + 1}, running_loss: {running_loss / 10}")
+        running_loss = 0.0
+    
+    
